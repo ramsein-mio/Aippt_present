@@ -63,7 +63,15 @@ function aipptServerPlugin(): Plugin {
 
           if (pathname === '/api/gemini/generate-outline' && req.method === 'POST') {
             const body = await readBody();
-            const { topic, pageCount = 12, language = 'en', audience = 'general', tone = 'informative', theme = 'scholarly-deep-blue' } = body;
+            const {
+              topic,
+              pageCount,
+              pageCountMode = 'AUTO',
+              language = 'en',
+              audience = 'general',
+              tone = 'informative',
+              theme = 'scholarly-deep-blue'
+            } = body;
             const ai = getAi();
 
             if (!ai) {
@@ -71,31 +79,28 @@ function aipptServerPlugin(): Plugin {
             }
 
             const prompt = `You are the lead presentation architect for AIPPT Present.
-Generate a structured, professional ${pageCount}-slide outline based on this subject matter:
+Generate a structured, professional slide outline based on this subject matter:
 "${topic}"
 
 Audience: ${audience}
 Tone: ${tone}
 Language: ${language}
 Selected Visual Theme: ${theme}
+Requested Slide Count: ${pageCount || 'DYNAMIC AUTO-OPTIMIZED'}
+Count Strategy: ${pageCountMode}
 
-Follow these strict rules:
-1. Exact page count: exactly ${pageCount} slides (from page_number 1 to ${pageCount}).
-2. Zero Hallucination: Do not fabricate specific clinical/financial statistical percentages unless provided in the prompt. Use qualitative, robust architectural and thematic claims.
-3. Visual Diversity: No two consecutive slides may share the same layout_type!
-Select from diverse layouts such as:
-- "cover_split_right_image" (Page 1)
-- "horizontal_milestone_chain"
-- "quadrant_matrix"
-- "two_column_comparison"
-- "stepped_process_flow"
-- "stat_hero_with_breakdown"
-- "hierarchical_cards_grid"
-- "architecture_flow_diagram"
-- "takeaway_synthesis_closing" (Last Page)
+Rules for Slide Count & Sizing:
+1. One Core Concept per Slide: Never cram multiple unrelated topics, and never add fluff.
+2. If Requested Slide Count is provided and mode is MANUAL: produce exactly that number of slides.
+3. If mode is AUTO: analyze semantic density and choose optimal N between 4 and 25 slides (short inputs < 150 words -> 5-7 slides; standard 150-600 words -> 8-11 slides; long 600-1500 words -> 12-16 slides; comprehensive > 1500 words -> 16-24 slides).
+4. Page 1 must always be layout_type "cover_split_right_image".
+5. Last page (Page N) must always be layout_type "takeaway_synthesis_closing".
+6. Consecutive slides must never share the same layout_type.
 
-4. Return pure valid JSON with this exact schema:
+Return valid JSON:
 {
+  "determined_page_count": ${pageCount || 8},
+  "reasoning_for_page_count": "Clear explanation of chosen slide count and content allocation",
   "visual_system": {
     "theme_name": "${theme}",
     "primary_bg": "#0A1128",
@@ -109,11 +114,11 @@ Select from diverse layouts such as:
     {
       "page_number": 1,
       "file_name": "pages/00.html",
-      "title": "Clear slide title",
+      "title": "Slide title",
       "subtitle": "Informative subtitle",
       "layout_type": "cover_split_right_image",
       "visual_component": "vector_constellation_svg",
-      "key_points": ["Key point 1", "Key point 2"],
+      "key_points": ["Point 1", "Point 2"],
       "source_reference": "Verified Framework Reference"
     }
   ]
@@ -124,7 +129,7 @@ Select from diverse layouts such as:
               contents: prompt,
               config: {
                 responseMimeType: 'application/json',
-                temperature: 0.4
+                temperature: 0.3
               }
             });
 

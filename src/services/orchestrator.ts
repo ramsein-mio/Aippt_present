@@ -24,8 +24,11 @@ const DEFAULT_LAYOUTS: LayoutType[] = [
   'takeaway_synthesis_closing'
 ];
 
+import { analyzeContentDensity } from './contentAnalyzer';
+
 export function createInitialState(topic = 'Artificial Intelligence: Foundations, History & Frontiers'): PresentationState {
   const defaultTheme = THEME_PRESETS['scholarly-deep-blue'];
+  const density = analyzeContentDensity(topic);
 
   return {
     job_id: 'job-' + Math.random().toString(36).substring(2, 10),
@@ -39,7 +42,9 @@ export function createInitialState(topic = 'Artificial Intelligence: Foundations
       { step: 5, title: 'Create closing page and run render-probe QA', completed: false, active: false }
     ],
     locked_params: {
-      page_count: 12,
+      page_count: density.optimal_slide_count,
+      page_count_mode: 'AUTO',
+      reasoning_for_page_count: density.reasoning,
       language: 'en',
       audience: 'general',
       tone: 'informative'
@@ -139,8 +144,21 @@ export class PresentationOrchestrator {
       }
     }
 
-    const { page_count, language, audience, tone } = this.state.locked_params;
     const topic = this.state.topic;
+    const density = analyzeContentDensity(topic);
+
+    let page_count = this.state.locked_params.page_count;
+    if (this.state.locked_params.page_count_mode === 'AUTO' || !page_count) {
+      page_count = density.optimal_slide_count;
+      this.state.locked_params.page_count = page_count;
+      this.state.locked_params.reasoning_for_page_count = density.reasoning;
+    } else if (density.is_explicit_override) {
+      page_count = density.optimal_slide_count;
+      this.state.locked_params.page_count = page_count;
+      this.state.locked_params.reasoning_for_page_count = density.reasoning;
+    }
+
+    const { language, audience, tone, page_count_mode } = this.state.locked_params;
 
     try {
       // NODE 1: Skill Loader & Interactive Parameter Locking
@@ -148,13 +166,19 @@ export class PresentationOrchestrator {
       this.emitState();
 
       await this.executeTool('load_skill', { skill_name: 'slide-expert' }, 'Initializing slide-expert workspace');
-      await this.executeTool('read_file', { file_path: 'skills/slide-expert/references/agent-runtime.md' }, 'Reading anti-bug rules & canvas constraints');
+      await this.executeTool('read_file', { file_path: 'skills/slide-expert/references/agent-runtime.md' }, 'Reading anti-bug rules & dynamic outline rules');
 
       // Update Mission Step 1
       this.state.mission_progress[0].completed = true;
       this.state.mission_progress[0].active = false;
       this.state.mission_progress[1].active = true;
-      await this.executeTool('update_mission_progress', { step_index: 1, completed: true }, 'Step 1 complete: Skill loaded & parameters locked');
+      await this.executeTool('update_mission_progress', {
+        step_index: 1,
+        completed: true,
+        page_count,
+        mode: page_count_mode || 'AUTO',
+        reasoning: this.state.locked_params.reasoning_for_page_count
+      }, `Step 1 complete: Locked ${page_count} slides (${page_count_mode || 'AUTO'})`);
       this.emitState();
 
       // NODE 2: Planner & Outline Generator
@@ -171,6 +195,7 @@ export class PresentationOrchestrator {
           body: JSON.stringify({
             topic,
             pageCount: page_count,
+            pageCountMode: page_count_mode || 'AUTO',
             language,
             audience,
             tone,
@@ -180,8 +205,15 @@ export class PresentationOrchestrator {
 
         if (res.ok) {
           const data = await res.json();
-          if (data.outline && Array.isArray(data.outline) && data.outline.length === page_count) {
+          if (data.outline && Array.isArray(data.outline) && data.outline.length >= 4) {
             generatedOutline = data.outline;
+            if (data.determined_page_count && data.determined_page_count !== page_count) {
+              page_count = data.determined_page_count;
+              this.state.locked_params.page_count = page_count;
+              if (data.reasoning_for_page_count) {
+                this.state.locked_params.reasoning_for_page_count = data.reasoning_for_page_count;
+              }
+            }
           }
         }
       } catch (err) {
@@ -189,12 +221,17 @@ export class PresentationOrchestrator {
       }
 
       // Fallback structured outline if API unavailable
-      if (!generatedOutline.length) {
+      if (!generatedOutline.length || generatedOutline.length !== page_count) {
         generatedOutline = this.buildDeterministicOutline(topic, page_count);
       }
 
       this.state.outline = generatedOutline;
-      await this.executeTool('lock_outline', { count: generatedOutline.length, outline: generatedOutline }, `Locked ${generatedOutline.length}-slide outline`);
+      await this.executeTool('lock_outline', {
+        count: generatedOutline.length,
+        determined_page_count: page_count,
+        reasoning: this.state.locked_params.reasoning_for_page_count,
+        outline: generatedOutline
+      }, `Locked ${generatedOutline.length}-slide outline`);
 
       // Update Mission Step 2
       this.state.mission_progress[1].completed = true;
@@ -484,21 +521,52 @@ export class PresentationOrchestrator {
       { title: 'Security, Boundary Integrity & Failure Modes', subtitle: 'Defense-in-depth against prompt injection and drift' },
       { title: 'Frontier Horizons & Emergent Capabilities', subtitle: 'Autonomous reasoning, self-healing loops, and agent systems' },
       { title: 'Strategic Roadmap & Execution Milestones', subtitle: 'Phase-by-phase tactical adoption framework' },
+      { title: 'Operational Risk Mitigation & Contingency Protocols', subtitle: 'Proactive defense and fault-tolerant architecture' },
+      { title: 'Cross-Functional Governance & Decision Velocity', subtitle: 'Aligning engineering, product, and leadership pipelines' },
+      { title: 'Regulatory Compliance & Global Standards', subtitle: 'Adherence to frontier AI safety and data privacy protocols' },
+      { title: 'Cost Optimization & Computational Efficiency', subtitle: 'Inference latency, memory footprints, and token budgets' },
+      { title: 'User Experience & Cognitive Interface Design', subtitle: 'Human-in-the-loop validation and ergonomic interactions' },
+      { title: 'Telemetry Monitoring & Real-Time Observability', subtitle: 'Continuous metrics, health probes, and automated alerts' },
+      { title: 'Competitive Moats & Sustainable Ecosystem Synergy', subtitle: 'Long-term network effects and platform differentiation' },
+      { title: 'Global Scalability & Edge Distribution Models', subtitle: 'Low-latency global edge topology and high availability' },
+      { title: 'Organizational Readiness & Team Skill Maturation', subtitle: 'Empowering cross-disciplinary engineering excellence' },
+      { title: 'Pilot Rollout & Empirical Case Study Metrics', subtitle: 'Field benchmarks, lessons learned, and validation wins' },
       { title: 'Executive Synthesis & Master Takeaways', subtitle: 'Summary of critical principles and immediate action items' }
     ];
 
+    const intermediateLayouts: LayoutType[] = [
+      'horizontal_milestone_chain',
+      'quadrant_matrix',
+      'two_column_comparison',
+      'stepped_process_flow',
+      'stat_hero_with_breakdown',
+      'hierarchical_cards_grid',
+      'architecture_flow_diagram'
+    ];
+
     for (let i = 0; i < count; i++) {
-      const info = slideTitles[i] || {
-        title: `Technical Deep-Dive: Pillar ${i + 1}`,
-        subtitle: `Structured analysis of ${topic} core dimensions`
-      };
+      let layout: LayoutType;
+      if (i === 0) {
+        layout = 'cover_split_right_image';
+      } else if (i === count - 1) {
+        layout = 'takeaway_synthesis_closing';
+      } else {
+        layout = intermediateLayouts[(i - 1) % intermediateLayouts.length];
+      }
+
+      const info = (i === count - 1)
+        ? slideTitles[slideTitles.length - 1]
+        : (slideTitles[i] || {
+            title: `Technical Deep-Dive: Pillar ${i + 1}`,
+            subtitle: `Structured analysis of ${topic} core dimensions`
+          });
 
       outline.push({
         page_number: i + 1,
         file_name: `pages/${String(i).padStart(2, '0')}.html`,
         title: info.title,
         subtitle: info.subtitle,
-        layout_type: DEFAULT_LAYOUTS[i % DEFAULT_LAYOUTS.length],
+        layout_type: layout,
         visual_component: `vector_layout_module_0${(i % 5) + 1}`,
         key_points: [
           `Key Pillar 01: Rigorous qualitative evidence on ${topic.slice(0, 24)}`,

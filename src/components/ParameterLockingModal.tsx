@@ -19,6 +19,8 @@ const PRESET_TOPICS = [
   'Biotechnology & CRISPR Genetic Engineering Horizons'
 ];
 
+import { analyzeContentDensity } from '../services/contentAnalyzer';
+
 export const ParameterLockingModal: React.FC<ParameterLockingModalProps> = ({
   isOpen,
   onClose,
@@ -28,23 +30,48 @@ export const ParameterLockingModal: React.FC<ParameterLockingModalProps> = ({
   onConfirm
 }) => {
   const [topic, setTopic] = useState(initialTopic);
-  const [pageCount, setPageCount] = useState<number>(currentParams.page_count || 12);
+  const [isAutoCount, setIsAutoCount] = useState<boolean>(
+    currentParams.page_count_mode !== 'MANUAL'
+  );
+  const [manualCount, setManualCount] = useState<number>(currentParams.page_count || 8);
   const [language, setLanguage] = useState(currentParams.language || 'en');
   const [audience, setAudience] = useState(currentParams.audience || 'general');
   const [tone, setTone] = useState(currentParams.tone || 'informative');
   const [theme, setTheme] = useState(currentTheme || 'scholarly-deep-blue');
 
+  const contentAnalysis = analyzeContentDensity(topic);
+  const effectiveCount = isAutoCount ? contentAnalysis.optimal_slide_count : manualCount;
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onConfirm(topic, { page_count: pageCount, language, audience, tone }, theme);
+    onConfirm(
+      topic,
+      {
+        page_count: effectiveCount,
+        page_count_mode: isAutoCount ? 'AUTO' : 'MANUAL',
+        reasoning_for_page_count: isAutoCount ? contentAnalysis.reasoning : `User specified manual ${manualCount}-slide count.`,
+        language,
+        audience,
+        tone
+      },
+      theme
+    );
   };
 
   const handleSkip = () => {
+    const analysis = analyzeContentDensity(initialTopic);
     onConfirm(
       initialTopic || 'Artificial Intelligence: Foundations, History and Frontiers',
-      { page_count: 12, language: 'en', audience: 'general', tone: 'informative' },
+      {
+        page_count: analysis.optimal_slide_count,
+        page_count_mode: 'AUTO',
+        reasoning_for_page_count: analysis.reasoning,
+        language: 'en',
+        audience: 'general',
+        tone: 'informative'
+      },
       'scholarly-deep-blue'
     );
   };
@@ -112,25 +139,89 @@ export const ParameterLockingModal: React.FC<ParameterLockingModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Page Count */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                Target Page Count
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {[6, 8, 12, 16].map((cnt) => (
-                  <button
-                    key={cnt}
-                    type="button"
-                    onClick={() => setPageCount(cnt)}
-                    className={`py-2 rounded-xl text-xs font-bold transition border ${
-                      pageCount === cnt
-                        ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-md shadow-cyan-500/10'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {cnt} Slides
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Slide Count Strategy
+                </label>
+                <span className="text-[11px] font-mono font-bold text-cyan-400">
+                  Target: {effectiveCount} Slides
+                </span>
               </div>
+
+              {/* Mode Toggle Bar: Auto vs Manual */}
+              <div className="flex gap-1.5 p-1 bg-slate-950 border border-slate-800 rounded-xl mb-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAutoCount(true)}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
+                    isAutoCount
+                      ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Auto (AI-Optimized)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAutoCount(false)}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition ${
+                    !isAutoCount
+                      ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>Manual Count</span>
+                </button>
+              </div>
+
+              {/* Auto Feedback or Manual Presets */}
+              {isAutoCount ? (
+                <div className="p-2.5 rounded-xl bg-cyan-950/20 border border-cyan-800/40 text-[11px] text-cyan-300/90 flex items-start gap-2">
+                  <span className="text-cyan-400 font-bold">ℹ</span>
+                  <div className="leading-tight">
+                    <span className="font-semibold">{contentAnalysis.reasoning}</span>
+                    {contentAnalysis.is_explicit_override && (
+                      <span className="block text-[10px] text-cyan-400 mt-0.5 font-mono">
+                        (Detected explicit request from input text)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[6, 8, 10, 12, 16].map((cnt) => (
+                      <button
+                        key={cnt}
+                        type="button"
+                        onClick={() => setManualCount(cnt)}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition border ${
+                          manualCount === cnt
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {cnt}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="text-[11px] text-slate-400">Custom (4–25):</span>
+                    <input
+                      type="number"
+                      min={4}
+                      max={25}
+                      value={manualCount}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val)) setManualCount(Math.max(4, Math.min(25, val)));
+                      }}
+                      className="w-20 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-cyan-300 focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Language */}

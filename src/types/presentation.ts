@@ -17,6 +17,8 @@ export interface MissionStep {
 
 export interface LockedParams {
   page_count: number;
+  page_count_mode?: 'AUTO' | 'MANUAL';
+  reasoning_for_page_count?: string;
   language: string;
   audience: string;
   tone: string;

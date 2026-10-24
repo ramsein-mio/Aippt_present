@@ -20,6 +20,7 @@ interface SlidePreviewViewerProps {
   onNext: () => void;
   onOpenSurgicalEditor: () => void;
   onReProbe: () => void;
+  onStartPresentation?: () => void;
 }
 
 export const SlidePreviewViewer: React.FC<SlidePreviewViewerProps> = ({
@@ -29,7 +30,8 @@ export const SlidePreviewViewer: React.FC<SlidePreviewViewerProps> = ({
   onPrev,
   onNext,
   onOpenSurgicalEditor,
-  onReProbe
+  onReProbe,
+  onStartPresentation
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState<number>(0.5);
@@ -110,6 +112,17 @@ export const SlidePreviewViewer: React.FC<SlidePreviewViewerProps> = ({
             <Wand2 className="w-3.5 h-3.5" />
             <span>Surgically Edit</span>
           </button>
+
+          {/* Present Fullscreen trigger */}
+          {onStartPresentation && (
+            <button
+              onClick={onStartPresentation}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 text-xs font-bold transition shadow-sm"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>Present Fullscreen</span>
+            </button>
+          )}
         </div>
       </div>
 

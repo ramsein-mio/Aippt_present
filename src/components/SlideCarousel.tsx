@@ -1,36 +1,52 @@
 import React, { useRef } from 'react';
 import { GeneratedPage } from '../types/presentation';
-import { Check, Loader2, Sparkles } from 'lucide-react';
+import { Check, Loader2, Sparkles, Play, Maximize2 } from 'lucide-react';
 
 interface SlideCarouselProps {
   pages: Record<number, GeneratedPage>;
   totalCount: number;
   activeIndex: number;
   onSelect: (index: number) => void;
+  onOpenPresentation?: (index: number) => void;
 }
 
 export const SlideCarousel: React.FC<SlideCarouselProps> = ({
   pages,
   totalCount,
   activeIndex,
-  onSelect
+  onSelect,
+  onOpenPresentation
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   // Scale ratio: 160 / 1920 = 0.0833333
   const scale = 160 / 1920;
+  const readyCount = Object.keys(pages).length;
 
   return (
     <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3 shadow-xl backdrop-blur-md">
       <div className="flex items-center justify-between mb-2 px-1">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-          <span>Live Slide Carousel</span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400">
-            {Object.keys(pages).length}/{totalCount} Ready
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <span>Live Slide Carousel</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400">
+              {readyCount}/{totalCount} Ready
+            </span>
           </span>
-        </span>
-        <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
-          Scaled 160×90 CSS Viewport (scale: 0.083)
-        </span>
+          <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
+            Scaled 160×90 Viewport
+          </span>
+        </div>
+
+        {/* Prominent Present Fullscreen Button above carousel */}
+        {readyCount > 0 && onOpenPresentation && (
+          <button
+            onClick={() => onOpenPresentation(activeIndex)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition active:scale-95 shadow-sm"
+          >
+            <Play className="w-3 h-3 fill-current" />
+            <span>Present Fullscreen</span>
+          </button>
+        )}
       </div>
 
       <div
@@ -46,6 +62,8 @@ export const SlideCarousel: React.FC<SlideCarouselProps> = ({
             <div
               key={index}
               onClick={() => page && onSelect(index)}
+              onDoubleClick={() => page && onOpenPresentation && onOpenPresentation(index)}
+              title={page ? `Slide ${index + 1}: ${page.title} (Double-click to present)` : `Slide ${index + 1} queued`}
               className={`relative shrink-0 rounded-xl transition-all cursor-pointer group ${
                 isActive
                   ? 'ring-2 ring-cyan-400 scale-[1.03] shadow-lg shadow-cyan-500/20'
@@ -71,6 +89,21 @@ export const SlideCarousel: React.FC<SlideCarouselProps> = ({
                     <Loader2 className="w-5 h-5 animate-spin text-slate-600 mb-1" />
                     <span className="text-[10px] font-mono font-bold">QUEUED</span>
                   </div>
+                )}
+
+                {/* Hover Play Button */}
+                {page && onOpenPresentation && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenPresentation(index);
+                    }}
+                    title="Present from this slide"
+                    className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1 text-cyan-300 font-bold text-[11px]"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>Present</span>
+                  </button>
                 )}
 
                 {/* Subtle Hover Overlay */}

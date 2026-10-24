@@ -367,6 +367,7 @@ export function App() {
             }
             onOpenSurgicalEditor={() => setIsSurgicalOpen(true)}
             onReProbe={handleReProbe}
+            onStartPresentation={() => setIsPresentationOpen(true)}
           />
         </div>
 
@@ -376,6 +377,10 @@ export function App() {
           totalCount={totalPages}
           activeIndex={state.active_page_index}
           onSelect={(idx) => setState((p) => ({ ...p, active_page_index: idx }))}
+          onOpenPresentation={(idx) => {
+            setState((p) => ({ ...p, active_page_index: idx }));
+            setIsPresentationOpen(true);
+          }}
         />
       </main>
 
@@ -403,6 +408,7 @@ export function App() {
         pages={state.generated_pages}
         totalCount={totalPages}
         initialIndex={state.active_page_index}
+        onExportPdf={handlePrintPdf}
       />
 
       <DeliveryReportModal
