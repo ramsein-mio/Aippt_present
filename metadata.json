@@ -1,0 +1,7 @@
+{
+  "name": "AIPPT Present - AI Presentation Generator & DOM Self-Healing Engine",
+  "description": "Autonomous AI presentation generation agent with 5-stage mission execution, interactive parameter locking, 1920x1080 SVG/HTML slide synthesis, live scaled iframe carousels, automated DOM render-probe quality assurance, and surgical self-healing.",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
